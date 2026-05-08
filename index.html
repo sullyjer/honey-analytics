@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>Brasil Honey Analytics</title>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- ECharts -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+<!-- PapaParse -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<!-- Leaflet -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+
+:root{
+  --cream:#FFFDF0;
+  --ivory:#FFF8DC;
+  --honey:#FFF3B0;
+
+  --title:#E8A020;
+  --subtitle:#C8860A;
+  --dark:#7A4F1E;
+
+  --border:#E8D5A3;
+
+  --c1:#FFD166;
+  --c2:#F4A261;
+  --c3:#A8C5A0;
+  --c4:#AED9E0;
+  --c5:#C9B8D8;
+  --c6:#FFBC80;
+}
+
+body{
+  background: linear-gradient(180deg,#FFFDF0 0%, #FFF8DC 100%);
+  color: var(--dark);
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.glass{
+  background: rgba(255,255,255,.45);
+  backdrop-filter: blur(14px);
+
+  border:1px solid rgba(255,255,255,.35);
+
+  box-shadow:
+    0 8px 32px rgba(0,0,0,.08),
+    inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+.chart{
+  width:100%;
+  height:420px;
+}
+
+#map{
+  width:100%;
+  height:520px;
+  border-radius:24px;
+  overflow:hidden;
+}
+
+.card-hover{
+  transition:.25s ease;
+}
+
+.card-hover:hover{
+  transform:translateY(-4px);
+}
+
+.title-gradient{
+  background: linear-gradient(90deg,var(--title),var(--c2));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+.filter-select{
+  background: rgba(255,255,255,.7);
+  border:1px solid var(--border);
+}
+
+.table-scroll{
+  max-height:500px;
+  overflow:auto;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="p-6 md:p-8">
+
+<!-- HEADER -->
+<div class="flex flex-col lg:flex-row justify-between items-start gap-5 mb-8">
+
+  <div>
+
+    <h1 class="text-5xl font-black title-gradient">
+      Brasil Honey Analytics
+    </h1>
+
+    <p class="mt-3 text-lg opacity-75">
+      Produção histórica de mel no Brasil • 2000–2024
+    </p>
+
+  </div>
+
+  <div class="flex flex-wrap gap-3">
+
+    <select id="yearFilter" class="filter-select px-4 py-3 rounded-2xl">
+      <option value="all">Todos os anos</option>
+    </select>
+
+    <select id="stateFilter" class="filter-select px-4 py-3 rounded-2xl">
+      <option value="all">Todos os estados</option>
+    </select>
+
+    <input
+      id="cityFilter"
+      type="text"
+      placeholder="Buscar município..."
+      class="filter-select px-4 py-3 rounded-2xl"
+    />
+
+    <button
+      id="resetFilters"
+      class="px-5 py-3 rounded-2xl bg-[#E8A020] text-white font-bold"
+    >
+      Resetar
+    </button>
+
+    <button
+      id="exportCSV"
+      class="px-5 py-3 rounded-2xl bg-[#A8C5A0] text-white font-bold"
+    >
+      Exportar CSV
+    </button>
+
+  </div>
+
+</div>
+
+<!-- KPIs -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
+
+  <div class="glass card-hover rounded-3xl p-6">
+    <p class="text-sm uppercase tracking-wider text-[#C8860A]">
+      Produção Total
+    </p>
+
+    <h2 id="kpiProduction" class="text-4xl font-black mt-3">
+      -
+    </h2>
+  </div>
+
+  <div class="glass card-hover rounded-3xl p-6">
+    <p class="text-sm uppercase tracking-wider text-[#C8860A]">
+      Valor Produzido
+    </p>
+
+    <h2 id="kpiValue" class="text-4xl font-black mt-3">
+      -
+    </h2>
+  </div>
+
+  <div class="glass card-hover rounded-3xl p-6">
+    <p class="text-sm uppercase tracking-wider text-[#C8860A]">
+      Preço Médio
+    </p>
+
+    <h2 id="kpiPrice" class="text-4xl font-black mt-3">
+      -
+    </h2>
+  </div>
+
+  <div class="glass card-hover rounded-3xl p-6">
+    <p class="text-sm uppercase tracking-wider text-[#C8860A]">
+      Municípios
+    </p>
+
+    <h2 id="kpiCities" class="text-4xl font-black mt-3">
+      -
+    </h2>
+  </div>
+
+  <div class="glass card-hover rounded-3xl p-6">
+    <p class="text-sm uppercase tracking-wider text-[#C8860A]">
+      Maior Estado
+    </p>
+
+    <h2 id="kpiState" class="text-4xl font-black mt-3">
+      -
+    </h2>
+  </div>
+
+  <div class="glass card-hover rounded-3xl p-6">
+    <p class="text-sm uppercase tracking-wider text-[#C8860A]">
+      Crescimento YoY
+    </p>
+
+    <h2 id="kpiGrowth" class="text-4xl font-black mt-3">
+      -
+    </h2>
+  </div>
+
+</div>
+
+<!-- MAIN CHART -->
+<div class="glass rounded-3xl p-6 mb-8">
+
+  <div class="flex justify-between items-center mb-4">
+
+    <div>
+      <h2 class="text-2xl font-bold">
+        Evolução Nacional
+      </h2>
+
+      <p class="text-sm opacity-70">
+        Produção total vs preço médio ponderado
+      </p>
+    </div>
+
+    <button
+      onclick="exportChart('mainChart')"
+      class="px-4 py-2 rounded-xl bg-[#FFD166] font-bold"
+    >
+      PNG
+    </button>
+
+  </div>
+
+  <div id="mainChart" class="chart"></div>
+
+</div>
+
+<!-- GRID -->
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+
+  <div class="glass rounded-3xl p-6">
+
+    <div class="flex justify-between items-center mb-4">
+
+      <h2 class="text-2xl font-bold">
+        Top Estados
+      </h2>
+
+      <button
+        onclick="exportChart('stateChart')"
+        class="px-4 py-2 rounded-xl bg-[#F4A261] text-white font-bold"
+      >
+        PNG
+      </button>
+
+    </div>
+
+    <div id="stateChart" class="chart"></div>
+
+  </div>
+
+  <div class="glass rounded-3xl p-6">
+
+    <div class="flex justify-between items-center mb-4">
+
+      <h2 class="text-2xl font-bold">
+        Treemap Estadual
+      </h2>
+
+      <button
+        onclick="exportChart('treemapChart')"
+        class="px-4 py-2 rounded-xl bg-[#A8C5A0] text-white font-bold"
+      >
+        PNG
+      </button>
+
+    </div>
+
+    <div id="treemapChart" class="chart"></div>
+
+  </div>
+
+</div>
+
+<!-- MAP -->
+<div class="glass rounded-3xl p-6 mb-8">
+
+  <div class="mb-5">
+
+    <h2 class="text-2xl font-bold">
+      Mapa Interativo do Brasil
+    </h2>
+
+    <p class="text-sm opacity-70">
+      Choropleth por produção estadual
+    </p>
+
+  </div>
+
+  <div id="map"></div>
+
+</div>
+
+<!-- HEATMAP -->
+<div class="glass rounded-3xl p-6 mb-8">
+
+  <div class="flex justify-between items-center mb-4">
+
+    <h2 class="text-2xl font-bold">
+      Heatmap Temporal
+    </h2>
+
+    <button
+      onclick="exportChart('heatmapChart')"
+      class="px-4 py-2 rounded-xl bg-[#AED9E0] font-bold"
+    >
+      PNG
+    </button>
+
+  </div>
+
+  <div id="heatmapChart" class="chart"></div>
+
+</div>
+
+<!-- MULTILINE -->
+<div class="glass rounded-3xl p-6 mb-8">
+
+  <h2 class="text-2xl font-bold mb-4">
+    Evolução Histórica por Estado
+  </h2>
+
+  <div id="multiLineChart" class="chart"></div>
+
+</div>
+
+<!-- TABLE -->
+<div class="glass rounded-3xl p-6 mb-8">
+
+  <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+
+    <div>
+
+      <h2 class="text-2xl font-bold">
+        Ranking de Municípios
+      </h2>
+
+      <p class="text-sm opacity-70">
+        Top produtores nacionais
+      </p>
+
+    </div>
+
+    <input
+      id="tableSearch"
+      type="text"
+      placeholder="Buscar município..."
+      class="filter-select px-4 py-3 rounded-xl"
+    />
+
+  </div>
+
+  <div class="table-scroll">
+
+    <table class="w-full">
+
+      <thead class="sticky top-0 bg-[#FFF8DC]">
+
+        <tr class="border-b border-[#E8D5A3]">
+
+          <th class="text-left p-4">Município</th>
+          <th class="text-left p-4">Estado</th>
+          <th class="text-right p-4">Produção</th>
+          <th class="text-right p-4">Valor</th>
+          <th class="text-right p-4">Preço Médio</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody id="municipalityTable"></tbody>
+
+    </table>
+
+  </div>
+
+</div>
+
+</div>
+
+<script>
+
+/* ======================================================
+   GLOBALS
+====================================================== */
+
+let rawData = [];
+let filteredData = [];
+
+let charts = {};
+let map;
+
+const COLORS = [
+  '#FFD166',
+  '#F4A261',
+  '#A8C5A0',
+  '#AED9E0',
+  '#C9B8D8',
+  '#FFBC80'
+];
+
+/* ======================================================
+   LOAD CSV
+====================================================== */
+
+Papa.parse('mel_tratado_2000_2024.csv', {
+
+  download:true,
+  header:true,
+  dynamicTyping:true,
+
+  complete:function(results){
+
+    rawData = results.data.filter(d => d.ano);
+
+    initializeFilters();
+    initializeMap();
+
+    applyFilters();
+
+  }
+
+});
+
+/* ======================================================
+   FILTERS
+====================================================== */
+
+function initializeFilters(){
+
+  const years = [...new Set(rawData.map(d=>d.ano))].sort();
+  const states = [...new Set(rawData.map(d=>d.estado))].sort();
+
+  years.forEach(y=>{
+
+    yearFilter.innerHTML += `
+      <option value="${y}">${y}</option>
+    `;
+
+  });
+
+  states.forEach(s=>{
+
+    stateFilter.innerHTML += `
+      <option value="${s}">${s}</option>
+    `;
+
+  });
+
+  yearFilter.addEventListener('change', applyFilters);
+  stateFilter.addEventListener('change', applyFilters);
+  cityFilter.addEventListener('input', applyFilters);
+
+  tableSearch.addEventListener('input', renderMunicipalityTable);
+
+  resetFilters.addEventListener('click', ()=>{
+
+    yearFilter.value = 'all';
+    stateFilter.value = 'all';
+    cityFilter.value = '';
+
+    applyFilters();
+
+  });
+
+  exportCSV.addEventListener('click', exportFilteredCSV);
+
+}
+
+function applyFilters(){
+
+  const year = yearFilter.value;
+  const state = stateFilter.value;
+  const city = cityFilter.value.toLowerCase();
+
+  filteredData = rawData.filter(d=>{
+
+    const yearMatch =
+      year === 'all' || d.ano == year;
+
+    const stateMatch =
+      state === 'all' || d.estado === state;
+
+    const cityMatch =
+      !city || d.municipio.toLowerCase().includes(city);
+
+    return yearMatch && stateMatch && cityMatch;
+
+  });
+
+  updateDashboard();
+
+}
+
+/* ======================================================
+   HELPERS
+====================================================== */
+
+function sum(arr){
+  return arr.reduce((a,b)=>a+b,0);
+}
+
+function groupBy(arr,key){
+
+  return arr.reduce((acc,item)=>{
+
+    acc[item[key]] = acc[item[key]] || [];
+    acc[item[key]].push(item);
+
+    return acc;
+
+  },{});
+
+}
+
+function formatNumber(v){
+
+  return new Intl.NumberFormat('pt-BR')
+    .format(v);
+
+}
+
+function formatMoney(v){
+
+  return new Intl.NumberFormat('pt-BR',{
+    style:'currency',
+    currency:'BRL'
+  }).format(v);
+
+}
+
+function weightedPrice(data){
+
+  const totalValue =
+    sum(data.map(d=>d.valor_producao_mil_reais * 1000));
+
+  const totalProd =
+    sum(data.map(d=>d.producao_kg));
+
+  return totalValue / totalProd;
+
+}
+
+/* ======================================================
+   DASHBOARD UPDATE
+====================================================== */
+
+function updateDashboard(){
+
+  renderKPIs();
+  renderMainChart();
+  renderStateChart();
+  renderTreemap();
+  renderHeatmap();
+  renderMultiLine();
+  renderMunicipalityTable();
+
+  updateMap();
+
+}
+
+/* ======================================================
+   KPI
+====================================================== */
+
+function renderKPIs(){
+
+  const totalProduction =
+    sum(filteredData.map(d=>d.producao_kg));
+
+  const totalValue =
+    sum(filteredData.map(d=>d.valor_producao_mil_reais));
+
+  const avgPrice =
+    weightedPrice(filteredData);
+
+  const municipalities =
+    new Set(filteredData.map(d=>d.municipio)).size;
+
+  const grouped =
+    groupBy(filteredData,'estado');
+
+  let topState = '-';
+  let maxState = 0;
+
+  Object.entries(grouped).forEach(([state,data])=>{
+
+    const prod =
+      sum(data.map(d=>d.producao_kg));
+
+    if(prod > maxState){
+
+      maxState = prod;
+      topState = state;
+
+    }
+
+  });
+
+  const yearly =
+    groupBy(rawData,'ano');
+
+  const years =
+    Object.keys(yearly).sort();
+
+  let growth = 0;
+
+  if(years.length >= 2){
+
+    const last =
+      years[years.length-1];
+
+    const prev =
+      years[years.length-2];
+
+    const lastProd =
+      sum(yearly[last].map(d=>d.producao_kg));
+
+    const prevProd =
+      sum(yearly[prev].map(d=>d.producao_kg));
+
+    growth =
+      ((lastProd-prevProd)/prevProd)*100;
+
+  }
+
+  kpiProduction.innerHTML =
+    `${formatNumber(Math.round(totalProduction/1000))}k`;
+
+  kpiValue.innerHTML =
+    formatMoney(totalValue * 1000);
+
+  kpiPrice.innerHTML =
+    `R$ ${avgPrice.toFixed(2)}`;
+
+  kpiCities.innerHTML =
+    formatNumber(municipalities);
+
+  kpiState.innerHTML =
+    topState;
+
+  kpiGrowth.innerHTML =
+    `${growth.toFixed(1)}%`;
+
+}
+
+/* ======================================================
+   MAIN CHART
+====================================================== */
+
+function renderMainChart(){
+
+  const grouped =
+    groupBy(filteredData,'ano');
+
+  const years =
+    Object.keys(grouped).sort();
+
+  const production =
+    years.map(y=>
+      sum(grouped[y].map(d=>d.producao_kg))
+    );
+
+  const prices =
+    years.map(y=>
+      weightedPrice(grouped[y]).toFixed(2)
+    );
+
+  charts.mainChart =
+    echarts.init(document.getElementById('mainChart'));
+
+  charts.mainChart.setOption({
+
+    tooltip:{
+      trigger:'axis'
+    },
+
+    legend:{
+      top:0
+    },
+
+    dataZoom:[
+      {type:'inside'},
+      {type:'slider'}
+    ],
+
+    xAxis:{
+      type:'category',
+      data:years
+    },
+
+    yAxis:[
+      {
+        type:'value',
+        name:'Produção'
+      },
+      {
+        type:'value',
+        name:'Preço Médio'
+      }
+    ],
+
+    series:[
+
+      {
+        name:'Produção',
+        type:'bar',
+        data:production,
+
+        itemStyle:{
+          color:'#FFD166',
+          borderRadius:[10,10,0,0]
+        }
+      },
+
+      {
+        name:'Preço Médio',
+        type:'line',
+        smooth:true,
+        yAxisIndex:1,
+        data:prices,
+
+        lineStyle:{
+          width:4,
+          color:'#F4A261'
+        }
+      }
+
+    ]
+
+  });
+
+}
+
+/* ======================================================
+   STATE CHART
+====================================================== */
+
+function renderStateChart(){
+
+  const grouped =
+    Object.entries(groupBy(filteredData,'estado'))
+    .map(([state,data])=>({
+      state,
+      production:sum(data.map(d=>d.producao_kg))
+    }))
+    .sort((a,b)=>b.production-a.production)
+    .slice(0,10);
+
+  charts.stateChart =
+    echarts.init(document.getElementById('stateChart'));
+
+  charts.stateChart.setOption({
+
+    tooltip:{},
+
+    xAxis:{
+      type:'value'
+    },
+
+    yAxis:{
+      type:'category',
+      data:grouped.map(d=>d.state)
+    },
+
+    series:[{
+
+      type:'bar',
+
+      data:grouped.map((d,i)=>({
+
+        value:d.production,
+
+        itemStyle:{
+          color:COLORS[i % COLORS.length]
+        }
+
+      })),
+
+      borderRadius:12
+
+    }]
+
+  });
+
+}
+
+/* ======================================================
+   TREEMAP
+====================================================== */
+
+function renderTreemap(){
+
+  const total =
+    sum(filteredData.map(d=>d.producao_kg));
+
+  const grouped =
+    Object.entries(groupBy(filteredData,'estado'))
+    .map(([state,data])=>({
+
+      name:state,
+
+      value:
+        sum(data.map(d=>d.producao_kg)),
+
+      percent:
+        (sum(data.map(d=>d.producao_kg))/total)*100
+
+    }));
+
+  charts.treemapChart =
+    echarts.init(document.getElementById('treemapChart'));
+
+  charts.treemapChart.setOption({
+
+    tooltip:{
+      formatter:(info)=>`
+        <strong>${info.name}</strong><br>
+        ${info.data.percent.toFixed(2)}%
+      `
+    },
+
+    series:[{
+
+      type:'treemap',
+      data:grouped,
+
+      roam:false,
+
+      breadcrumb:{
+        show:false
+      },
+
+      itemStyle:{
+        borderColor:'#fff',
+        borderWidth:3
+      },
+
+      levels:[{
+        color:COLORS
+      }]
+
+    }]
+
+  });
+
+}
+
+/* ======================================================
+   HEATMAP
+====================================================== */
+
+function renderHeatmap(){
+
+  const states =
+    [...new Set(filteredData.map(d=>d.estado))];
+
+  const years =
+    [...new Set(filteredData.map(d=>d.ano))]
+    .sort();
+
+  const heatData = [];
+
+  states.forEach((state,si)=>{
+
+    years.forEach((year,yi)=>{
+
+      const subset =
+        filteredData.filter(
+          d => d.estado===state && d.ano===year
+        );
+
+      const prod =
+        sum(subset.map(d=>d.producao_kg));
+
+      heatData.push([yi,si,prod]);
+
+    });
+
+  });
+
+  charts.heatmapChart =
+    echarts.init(document.getElementById('heatmapChart'));
+
+  charts.heatmapChart.setOption({
+
+    tooltip:{},
+
+    xAxis:{
+      type:'category',
+      data:years
+    },
+
+    yAxis:{
+      type:'category',
+      data:states
+    },
+
+    visualMap:{
+
+      min:0,
+
+      max:
+        Math.max(...heatData.map(d=>d[2])),
+
+      calculable:true,
+
+      orient:'horizontal',
+
+      left:'center',
+
+      bottom:0,
+
+      inRange:{
+        color:[
+          '#FFF3B0',
+          '#FFD166',
+          '#F4A261',
+          '#7A4F1E'
+        ]
+      }
+
+    },
+
+    series:[{
+      type:'heatmap',
+      data:heatData
+    }]
+
+  });
+
+}
+
+/* ======================================================
+   MULTILINE
+====================================================== */
+
+function renderMultiLine(){
+
+  const grouped =
+    groupBy(filteredData,'estado');
+
+  const years =
+    [...new Set(filteredData.map(d=>d.ano))]
+    .sort();
+
+  const states =
+    Object.keys(grouped).slice(0,8);
+
+  const series = states.map((state,index)=>({
+
+    name:state,
+    type:'line',
+    smooth:true,
+
+    data:years.map(year=>{
+
+      const subset =
+        grouped[state].filter(
+          d=>d.ano===year
+        );
+
+      return sum(subset.map(d=>d.producao_kg));
+
+    }),
+
+    lineStyle:{
+      width:3,
+      color:COLORS[index % COLORS.length]
+    }
+
+  }));
+
+  charts.multiLineChart =
+    echarts.init(document.getElementById('multiLineChart'));
+
+  charts.multiLineChart.setOption({
+
+    tooltip:{
+      trigger:'axis'
+    },
+
+    legend:{
+      top:0
+    },
+
+    xAxis:{
+      type:'category',
+      data:years
+    },
+
+    yAxis:{
+      type:'value'
+    },
+
+    series
+
+  });
+
+}
+
+/* ======================================================
+   TABLE
+====================================================== */
+
+function renderMunicipalityTable(){
+
+  const search =
+    tableSearch.value.toLowerCase();
+
+  const grouped =
+    Object.entries(groupBy(filteredData,'municipio'))
+    .map(([city,data])=>{
+
+      const production =
+        sum(data.map(d=>d.producao_kg));
+
+      const value =
+        sum(data.map(d=>d.valor_producao_mil_reais));
+
+      return{
+
+        city,
+
+        state:data[0].estado,
+
+        production,
+
+        value,
+
+        price:
+          (value*1000)/production
+
+      };
+
+    })
+    .filter(d=>
+      d.city.toLowerCase().includes(search)
+    )
+    .sort((a,b)=>b.production-a.production)
+    .slice(0,100);
+
+  municipalityTable.innerHTML =
+    grouped.map(d=>`
+
+      <tr class="border-b border-[#E8D5A3] hover:bg-white/40">
+
+        <td class="p-4">${d.city}</td>
+
+        <td class="p-4">${d.state}</td>
+
+        <td class="p-4 text-right">
+          ${formatNumber(Math.round(d.production))}
+        </td>
+
+        <td class="p-4 text-right">
+          ${formatMoney(d.value*1000)}
+        </td>
+
+        <td class="p-4 text-right">
+          R$ ${d.price.toFixed(2)}
+        </td>
+
+      </tr>
+
+    `).join('');
+
+}
+
+/* ======================================================
+   MAP
+====================================================== */
+
+function initializeMap(){
+
+  map = L.map('map').setView([-15,-55],4);
+
+  L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+      attribution:'© OpenStreetMap'
+    }
+  ).addTo(map);
+
+}
+
+async function updateMap(){
+
+  if(window.geoLayer){
+
+    map.removeLayer(window.geoLayer);
+
+  }
+
+  const productionByState = {};
+
+  filteredData.forEach(d=>{
+
+    if(!productionByState[d.estado]){
+
+      productionByState[d.estado] = {
+
+        production:0,
+        value:0
+
+      };
+
+    }
+
+    productionByState[d.estado].production +=
+      d.producao_kg;
+
+    productionByState[d.estado].value +=
+      d.valor_producao_mil_reais;
+
+  });
+
+  const response =
+    await fetch('brasil_estados.geojson');
+
+  const geojson =
+    await response.json();
+
+  const values =
+    Object.values(productionByState)
+    .map(d=>d.production);
+
+  const max =
+    Math.max(...values);
+
+  function getColor(value){
+
+    const ratio = value / max;
+
+    if(ratio > .8) return '#7A4F1E';
+    if(ratio > .6) return '#C8860A';
+    if(ratio > .4) return '#E8A020';
+    if(ratio > .2) return '#FFD166';
+
+    return '#FFF3B0';
+
+  }
+
+  window.geoLayer = L.geoJSON(geojson,{
+
+    style:feature=>{
+
+      const uf =
+        feature.properties.sigla ||
+        feature.properties.name;
+
+      const stateData =
+        productionByState[uf];
+
+      const production =
+        stateData
+        ? stateData.production
+        : 0;
+
+      return{
+
+        fillColor:getColor(production),
+
+        weight:1,
+
+        opacity:1,
+
+        color:'#ffffff',
+
+        fillOpacity:.8
+
+      };
+
+    },
+
+    onEachFeature:(feature,layer)=>{
+
+      const uf =
+        feature.properties.sigla ||
+        feature.properties.name;
+
+      const stateData =
+        productionByState[uf];
+
+      if(stateData){
+
+        const avgPrice =
+          (stateData.value * 1000)
+          / stateData.production;
+
+        layer.bindTooltip(`
+
+          <div style="padding:8px">
+
+            <strong>${uf}</strong><br>
+
+            Produção:
+            ${formatNumber(Math.round(stateData.production))} kg
+            <br>
+
+            Valor:
+            ${formatMoney(stateData.value * 1000)}
+            <br>
+
+            Preço Médio:
+            R$ ${avgPrice.toFixed(2)}/kg
+
+          </div>
+
+        `);
+
+      }
+
+      layer.on('click',()=>{
+
+        stateFilter.value = uf;
+
+        applyFilters();
+
+      });
+
+    }
+
+  }).addTo(map);
+
+}
+
+/* ======================================================
+   EXPORTS
+====================================================== */
+
+function exportChart(chartId){
+
+  const chart =
+    charts[chartId];
+
+  const url =
+    chart.getDataURL({
+
+      pixelRatio:2,
+      backgroundColor:'#fff'
+
+    });
+
+  const link =
+    document.createElement('a');
+
+  link.href = url;
+
+  link.download =
+    `${chartId}.png`;
+
+  link.click();
+
+}
+
+function exportFilteredCSV(){
+
+  const csv =
+    Papa.unparse(filteredData);
+
+  const blob =
+    new Blob(
+      [csv],
+      {
+        type:'text/csv;charset=utf-8;'
+      }
+    );
+
+  const link =
+    document.createElement('a');
+
+  link.href =
+    URL.createObjectURL(blob);
+
+  link.download =
+    'dados_filtrados_mel.csv';
+
+  link.click();
+
+}
+
+/* ======================================================
+   RESIZE
+====================================================== */
+
+window.addEventListener('resize',()=>{
+
+  Object.values(charts)
+    .forEach(chart=>chart.resize());
+
+});
+
+</script>
+
+</body>
+</html>
